@@ -45,7 +45,7 @@ class Classifier(nn.Module):
         self.fc1 = nn.Linear(n_inp, n_out)
 
     def forward(self, x):
-        return self.fc1(features)
+        return self.fc1(x)
 
 
 class Resnet101(nn.Module):
