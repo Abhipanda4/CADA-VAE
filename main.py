@@ -123,7 +123,9 @@ def main():
         for idx, (features, _, label_idx) in enumerate(final_train_generator):
             loss = train_agent.fit_final_classifier(features, label_idx)
             total_loss += loss
-        # print(total_loss)
+
+        total_loss = total_loss / (idx + 1)
+        print('[Final Classifier Training] Loss for epoch: [%3d]: %.3f' % (ep, total_loss))
 
         ## find accuracy on test data
         if args.gzsl:

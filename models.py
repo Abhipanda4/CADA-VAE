@@ -24,6 +24,7 @@ class Encoder(nn.Module):
         mu, log_var = self.mu_head(x), self.logvar_head(x)
         return mu, log_var
 
+
 class Decoder(nn.Module):
     def __init__(self, n_inp, n_hidden, n_out):
         super(Decoder, self).__init__()
@@ -37,11 +38,26 @@ class Decoder(nn.Module):
     def forward(self, x):
         return self.decoder(x)
 
-class Classifier(nn.Module):
-    def __init__(self, input_dim, num_class):
-        super(Classifier, self).__init__()
-        self.fc = nn.Linear(input_dim,num_class)
 
-    def forward(self, features):
-        x = self.fc(features)
-        return x
+class Classifier(nn.Module):
+    def __init__(self, n_inp, n_out):
+        super(Classifier, self).__init__()
+        self.fc1 = nn.Linear(n_inp, n_out)
+
+    def forward(self, x):
+        return self.fc1(features)
+
+
+class Resnet101(nn.Module):
+    def __init__(self, finetune=False):
+        super(Resnet101, self).__init__()
+        resnet101 = models.resnet101(pretrained=True)
+        modules = list(resnet101.children())[:-1]
+
+        self.model = nn.Sequential(*modules)
+        if not finetune:
+            for p in self.model.parameters():
+                p.requires_grad = False
+
+    def forward(self, x):
+        return self.model(x).squeeze()

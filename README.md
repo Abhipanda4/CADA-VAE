@@ -15,3 +15,4 @@ On Awa2: 0.6097297326786651(HM) 0.7878890392422192(Seen) 0.4972829521041324(Unse
 * improve accuracies
 * extra discriminator benefits?
 * Improve README
+* add instructions for running code
