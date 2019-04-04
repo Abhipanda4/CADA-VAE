@@ -11,7 +11,7 @@ from sklearn.metrics import accuracy_score
 from models import Encoder, Decoder, Classifier
 
 class Trainer:
-    def __init__(self, device, x_dim, c_dim, z_dim, n_train, n_test, lr, layer_sizes, **kwargs):
+    def __init__(self, device, dset, x_dim, c_dim, z_dim, n_train, n_test, lr, layer_sizes, **kwargs):
         '''
         Trainer class
         Args:
@@ -26,6 +26,7 @@ class Trainer:
             **kwargs              : Flags for using various regularizations
         '''
         self.device = device
+        self.dset = dset
         self.lr = lr
         self.z_dim = z_dim
 
@@ -252,7 +253,7 @@ class Trainer:
             flags += '-ca'
         if self.use_discriminator:
             flags += '-disc'
-        model_name = 'vae_model__lr-%f__z-%d__%s.pth' %(self.lr, self.z_dim, flags)
+        model_name = 'vae_model__dset-%s__lr-%f__z-%d__%s.pth' %(self.dset, self.lr, self.z_dim, flags)
         return model_name
 
     def save_VAE(self, ep):

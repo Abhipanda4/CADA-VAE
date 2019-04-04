@@ -56,7 +56,7 @@ def main():
         'use_discriminator': args.discriminator,
     }
     train_agent = Trainer(
-        device, x_dim, attr_dim, args.latent_dim,
+        device, args.dataset, x_dim, attr_dim, args.latent_dim,
         n_train, n_test, args.lr, layer_sizes, **kwargs
     )
     vae_start_ep, disc_start_ep = train_agent.load_models()
