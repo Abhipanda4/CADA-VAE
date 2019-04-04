@@ -28,6 +28,11 @@ def main():
         attr_dim = 85
         n_train = 40
         n_test = 10
+    elif args.dataset == 'cub':
+        x_dim = 2048
+        attr_dim = 312
+        n_train = 150
+        n_test = 50
     else:
         raise NotImplementedError
 
@@ -131,7 +136,7 @@ def main():
         if args.gzsl:
             acc_s, acc_u = train_agent.compute_accuracy(test_generator, True)
             acc = 2 * acc_s * acc_u / (acc_s + acc_u)
-            print(acc, acc_s, acc_u)
+            # print(acc, acc_s, acc_u)
         else:
             acc = train_agent.compute_accuracy(test_generator, True)
 

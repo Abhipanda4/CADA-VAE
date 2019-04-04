@@ -45,13 +45,9 @@ class ZSLDataset(Dataset):
         # file with all class names for deciding train/test split
         self.class_names = './datasets/%s/classes.txt' % dset
 
-        if dset == 'awa2':
-            self.test_classes = [
-                'sheep','dolphin','bat','seal','blue+whale',
-                'rat','horse','walrus','giraffe','bobcat'
-            ]
-        else:
-            raise NotImplementedError
+        # test class names
+        with open('./datasets/%s/testclasses.txt' % dset) as fp:
+            self.test_classes = [i.strip() for i in fp.readlines()]
 
         if self.synthetic:
             assert syn_dataset is not None
