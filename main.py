@@ -112,7 +112,7 @@ def main():
         seen_dataset = train_dataset.gzsl_dataset
 
     syn_dataset = train_agent.create_syn_dataset(
-            train_dataset.test_labels, train_dataset.attributes, seen_dataset)
+            train_dataset.test_classmap, train_dataset.attributes, seen_dataset)
     final_dataset = ZSLDataset(args.dataset, n_train, n_test,
             train=True, gzsl=args.gzsl, synthetic=True, syn_dataset=syn_dataset)
     final_train_generator = DataLoader(final_dataset, **params)
