@@ -22,6 +22,7 @@ def parse_args():
     return parser.parse_args()
 
 def main():
+    # setup parameters for trainer
     args = parse_args()
     if args.dataset == 'awa2' or args.dataset == 'awa1':
         x_dim = 2048
@@ -65,36 +66,20 @@ def main():
         'use_ca': args.ca,
         'use_discriminator': args.discriminator,
     }
+
     train_agent = Trainer(
         device, args.dataset, x_dim, attr_dim, args.latent_dim,
         n_train, n_test, args.lr, layer_sizes, **kwargs
     )
-    vae_start_ep, disc_start_ep = train_agent.load_models()
 
-    if args.discriminator:
-        # pretrain the discriminator
-        print('Pretraining the discriminator')
-        for ep in range(disc_start_ep + 1, args.n_epochs + 1):
-            total_loss = 0
-            for idx, (img_features, attr, label_idx) in enumerate(train_generator):
-                loss = train_agent.fit_discriminator(img_features, attr, label_idx)
-                total_loss += loss
-
-            print("[Pretraining Phase] Loss for epoch: [%3d] : %.4f" %(ep, total_loss))
-
-            # save the discriminator parameters
-            train_agent.save_discriminator(ep)
-
-        print('\n' + '=' * 50 + '\n')
-        print(train_agent.compute_accuracy(train_generator))
-
+    # load previous models, if any
+    vae_start_ep = train_agent.load_models()
 
     print('Training the VAE')
     for ep in range(vae_start_ep + 1, args.n_epochs + 1):
         # train the VAE
         vae_loss = 0.0
         da_loss, ca_loss = 0.0, 0.0
-        disc_loss = 0.0
 
         for idx, (img_features, attr, label_idx) in enumerate(train_generator):
             losses = train_agent.fit_VAE(img_features, attr, label_idx, ep)
@@ -102,12 +87,11 @@ def main():
             vae_loss  += losses[0]
             da_loss   += losses[1]
             ca_loss   += losses[2]
-            disc_loss += losses[3]
 
         n_batches = idx + 1
         print("[VAE Training] Losses for epoch: [%3d] : " \
-                "%.4f(V), %.4f(D), %.4f(C), %.4f(Disc)" \
-                %(ep, vae_loss/n_batches, da_loss/n_batches, ca_loss/n_batches, disc_loss/n_batches))
+                "%.4f(V), %.4f(D), %.4f(C)" \
+                %(ep, vae_loss/n_batches, da_loss/n_batches, ca_loss/n_batches))
 
         # save VAE after each epoch
         train_agent.save_VAE(ep)
@@ -139,11 +123,11 @@ def main():
 
         ## find accuracy on test data
         if args.gzsl:
-            acc_s, acc_u = train_agent.compute_accuracy(test_generator, True)
+            acc_s, acc_u = train_agent.compute_accuracy(test_generator)
             acc = 2 * acc_s * acc_u / (acc_s + acc_u)
             # print(acc, acc_s, acc_u)
         else:
-            acc = train_agent.compute_accuracy(test_generator, True)
+            acc = train_agent.compute_accuracy(test_generator)
 
         if acc >= best_acc:
             best_acc = acc

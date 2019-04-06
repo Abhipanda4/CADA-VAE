@@ -9,19 +9,17 @@ from sklearn.preprocessing import MinMaxScaler
 
 class ZSLDataset(Dataset):
     def __init__(self, dset, n_train, n_test, train=True, gzsl=False, synthetic=False, syn_dataset=None):
-        '''TODO: Docstring here
-
+        '''
+        Base class for all datasets
         Args:
-            dset (TODO): TODO
-            n_train (TODO): TODO
-            n_test (TODO): TODO
-
-        Kwargs:
-            train (TODO): TODO
-            gzsl (TODO): TODO
-            synthetic (TODO): TODO
-            syn_dataset (TODO): TODO
-
+            dset        : Name of dataset - 1 among [sun, cub, awa1, awa2]
+            n_train     : Number of train classes
+            n_test      : Number of test classes
+            train       : Boolean indicating whether train/test
+            gzsl        : Boolean for Generalized ZSL
+            synthetic   : Boolean indicating whether dataset is for synthetic examples
+            syn_dataset : A list consisting of 3-tuple (z, _, y) used for sampling
+                          only when synthetic flag is True
         '''
         super(ZSLDataset, self).__init__()
         self.dset = dset
@@ -59,8 +57,10 @@ class ZSLDataset(Dataset):
 
     def get_classmap(self):
         '''
-        Returns the classmap of all classes to be used as test set
-        as described in proposed split
+        Creates a mapping between serial number of a class
+        in provided dataset and the indices used for classification.
+        Returns:
+            2 dicts, 1 each for train and test classes
         '''
         with open(self.class_names_file) as fp:
             all_classes = fp.readlines()
@@ -86,6 +86,10 @@ class ZSLDataset(Dataset):
         return train_classmap, test_classmap
 
     def create_gzsl_dataset(self, n_samples=200):
+        '''
+        Create an auxillary dataset to be used during training final
+        classifier on seen classes
+        '''
         dataset = []
         for key, features in self.gzsl_map.items():
             aug_features = [random.choice(features) for _ in range(n_samples)]
@@ -94,9 +98,7 @@ class ZSLDataset(Dataset):
 
     def create_orig_dataset(self):
         '''
-        Partitions all image features into train/test based on proposed split
-        Returns 2 lists, train_set & test_set: each entry of list is a 3-tuple
-        (feature, label_in_dataset, label_for_classification)
+        Returns list of 3-tuple: (feature, label_in_dataset, label_for_classification)
         '''
         self.train_classmap, self.test_classmap = self.get_classmap()
 

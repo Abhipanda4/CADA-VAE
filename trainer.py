@@ -44,7 +44,7 @@ class Trainer:
         self.optimizer = optim.Adam(params, lr=lr)
 
         ## Extra discriminator - EXPERIMENTAL
-        self.discriminator = Classifier(x_dim, n_train).to(self.device)
+        self.discriminator = Classifier(z_dim, n_train).to(self.device)
         self.criterion = nn.CrossEntropyLoss()
         self.disc_optim = optim.Adam(self.discriminator.parameters(), lr=1e-6)
 
@@ -63,7 +63,7 @@ class Trainer:
         self.use_discriminator = kwargs.get('use_discriminator', False)
 
         self.vae_save_path = './saved_models'
-        self.disc_save_path = './saved_models/disc_model.pth'
+        self.disc_save_path = './saved_models/disc_model_%s.pth' % self.dset
 
     def fit_VAE(self, x, c, y, ep):
         '''
@@ -74,7 +74,8 @@ class Trainer:
             y (torch.Tensor) : Target labels of size (batch_size,)
             ep (int)         : Epoch number
         Returns:
-            Loss for the minibatch
+            Loss for the minibatch -
+            3-tuple with (vae_loss, distributn loss, cross_recon loss)
         '''
         self.anneal_parameters(ep)
 
@@ -100,7 +101,7 @@ class Trainer:
         D_kl_x = self.compute_kl_div(mu_x, logvar_x)
         D_kl_c = self.compute_kl_div(mu_c, logvar_c)
 
-        # VAE Loss = recon_loss + KL_Divergence_loss
+        # VAE Loss = recon_loss - KL_Divergence_loss
         L_vae_x = L_recon_x - self.beta * D_kl_x
         L_vae_c = L_recon_c - self.beta * D_kl_c
         L_vae = L_vae_x + L_vae_c
@@ -121,17 +122,7 @@ class Trainer:
         if self.use_da:
             L_da = 2 * self.compute_da_loss(mu_x, logvar_x, mu_c, logvar_c)
 
-        # calculate discriminator loss
-        L_cls = torch.zeros(1).to(self.device)
-        if self.use_discriminator:
-            with torch.no_grad():
-                logits = self.discriminator(x_recon)
-
-            probs = F.softmax(logits, dim=0)
-            log_prob = torch.log(torch.gather(probs, 1, y.unsqueeze(1)))
-            L_cls = -1 * torch.mean(log_prob)
-
-        total_loss = L_vae + self.gamma * L_ca + self.delta * L_da + self.alpha * L_cls
+        total_loss = L_vae + self.gamma * L_ca + self.delta * L_da
 
         self.optimizer.zero_grad()
         total_loss.backward()
@@ -141,7 +132,7 @@ class Trainer:
 
     def reparameterize(self, mu, log_var):
         '''
-        Reparameterization trick
+        Reparameterization trick using unimodal gaussian
         '''
         # eps = Variable(torch.randn(mu.size())).to(self.device)
         eps = Variable(torch.randn(mu.size()[0], 1).expand(mu.size())).to(self.device)
@@ -149,6 +140,9 @@ class Trainer:
         return z
 
     def anneal_parameters(self, epoch):
+        '''
+        Change weight factors of various losses based on epoch number
+        '''
         # weight of kl divergence loss
         if epoch <= 90:
             self.beta = 0.0026 * epoch
@@ -214,38 +208,11 @@ class Trainer:
 
         return loss.item()
 
-    def fit_discriminator(self, x, c, y):
-        '''
-        Train the discriminator on labelled data.
-        Args:
-            x (torch.Tensor) : Features of size (batch_size, 2048)
-            c (torch.Tensor) : Attributes of size (batch_size, attr_dim)
-            y (torch.Tensor) : Target labels of size (batch_size,)
-        Returns:
-            Loss for the minibatch
-        '''
-        x = Variable(x.float()).to(self.device)
-        c = Variable(c.float()).to(self.device)
-        y = Variable(y.long()).to(self.device)
-
-        logits = self.discriminator(x)
-        loss = self.criterion(logits, y)
-
-        self.disc_optim.zero_grad()
-        loss.backward()
-        self.disc_optim.step()
-
-        return loss.item()
-
-    def save_discriminator(self, ep):
-        state = {
-            'epoch'          : ep,
-            'discriminator'  : self.discriminator.state_dict(),
-            'disc_optimizer' : self.disc_optim.state_dict()
-        }
-        torch.save(state, self.disc_save_path)
-
     def get_vae_savename(self):
+        '''
+        Returns a string indicative of various flags used during training and
+        dataset used. Works as a unique name for saving models
+        '''
         flags = ''
         if self.use_da:
             flags += '-da'
@@ -268,27 +235,39 @@ class Trainer:
         model_name = self.get_vae_savename()
         torch.save(state, os.path.join(self.vae_save_path, model_name))
 
-    def load_models(self):
-        e1, e2 = 0, 0
-        vae_model = os.path.join(self.vae_save_path, self.get_vae_savename())
+    def load_models(self, model_path=''):
+        if model_path is '':
+            model_path = os.path.join(self.vae_save_path, self.get_vae_savename())
+
+        ep = 0
         if os.path.exists(vae_model):
-            checkpoint = torch.load(vae_model)
+            checkpoint = torch.load(model_path)
             self.x_encoder.load_state_dict(checkpoint['x_encoder'])
             self.x_decoder.load_state_dict(checkpoint['x_decoder'])
             self.c_encoder.load_state_dict(checkpoint['c_encoder'])
             self.c_decoder.load_state_dict(checkpoint['c_decoder'])
             self.optimizer.load_state_dict(checkpoint['optimizer'])
-            e1 = checkpoint['epoch']
+            ep = checkpoint['epoch']
 
-        if os.path.exists(self.disc_save_path):
-            checkpoint = torch.load(self.disc_save_path)
-            self.discriminator.load_state_dict(checkpoint['discriminator'])
-            self.disc_optim.load_state_dict(checkpoint['disc_optimizer'])
-            e2 = checkpoint['epoch']
-
-        return e1, e2
+        return ep
 
     def create_syn_dataset(self, test_labels, attributes, seen_dataset, n_samples=400):
+        '''
+        Creates a synthetic dataset based on attribute vectors of unseen class
+        Args:
+            test_labels: A dict with key as original serial number in provided
+                dataset and value as the index which is predicted during
+                classification by network
+            attributes: A np array containing class attributes for each class
+                of dataset
+            seen_dataset: A list of 3-tuple (x, _, y) where x belongs to one of the
+                seen classes and y is corresponding label. Used for generating
+                latent representations of seen classes in GZSL
+            n_samples: Number of samples of each unseen class to be generated(Default: 400)
+        Returns:
+            A list of 3-tuple (z, _, y) where z is latent representations and y is
+            corresponding label
+        '''
         syn_dataset = []
         for test_cls, idx in test_labels.items():
             attr = attributes[test_cls - 1]
@@ -311,21 +290,17 @@ class Trainer:
 
         return syn_dataset
 
-    def compute_accuracy(self, generator, final=False):
+    def compute_accuracy(self, generator):
         y_real_list, y_pred_list = [], []
 
         for idx, (x, _, y) in enumerate(generator):
             x = Variable(x.float()).to(self.device)
             y = Variable(y.long()).to(self.device)
 
-            if final:
-                self.final_classifier.eval()
-                self.x_encoder.eval()
-                mu, log_var = self.x_encoder(x)
-                logits = self.final_classifier(mu)
-            else:
-                self.discriminator.eval()
-                logits = self.discriminator(x)
+            self.final_classifier.eval()
+            self.x_encoder.eval()
+            mu, log_var = self.x_encoder(x)
+            logits = self.final_classifier(mu)
 
             _, y_pred = logits.max(dim=1)
 
