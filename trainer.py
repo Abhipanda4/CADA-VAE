@@ -128,7 +128,7 @@ class Trainer:
         total_loss.backward()
         self.optimizer.step()
 
-        return L_vae.item(), L_da.item(), L_ca.item(), L_cls.item()
+        return L_vae.item(), L_da.item(), L_ca.item()
 
     def reparameterize(self, mu, log_var):
         '''
@@ -240,7 +240,7 @@ class Trainer:
             model_path = os.path.join(self.vae_save_path, self.get_vae_savename())
 
         ep = 0
-        if os.path.exists(vae_model):
+        if os.path.exists(model_path):
             checkpoint = torch.load(model_path)
             self.x_encoder.load_state_dict(checkpoint['x_encoder'])
             self.x_decoder.load_state_dict(checkpoint['x_decoder'])
@@ -313,7 +313,7 @@ class Trainer:
         ## We have sequence of real and predicted labels
         ## find seen and unseen classes accuracy
 
-        if self.gzsl and final:
+        if self.gzsl:
             y_real_list = np.asarray(y_real_list)
             y_pred_list = np.asarray(y_pred_list)
 

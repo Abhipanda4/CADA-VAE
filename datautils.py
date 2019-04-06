@@ -92,7 +92,11 @@ class ZSLDataset(Dataset):
         '''
         dataset = []
         for key, features in self.gzsl_map.items():
-            aug_features = [random.choice(features) for _ in range(n_samples)]
+            if len(features) < n_samples:
+                aug_features = [random.choice(features) for _ in range(n_samples)]
+            else:
+                aug_features = random.sample(features, n_samples)
+
             dataset.extend([(f, -1, key) for f in aug_features])
         return dataset
 
