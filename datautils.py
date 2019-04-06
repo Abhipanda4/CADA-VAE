@@ -107,7 +107,7 @@ class ZSLDataset(Dataset):
         self.train_classmap, self.test_classmap = self.get_classmap()
 
         if self.train:
-            labels = self.attribute_dict['train_loc'].reshape(-1)
+            labels = self.attribute_dict['trainval_loc'].reshape(-1)
             classmap = self.train_classmap
             self.gzsl_map = dict()
         else:
