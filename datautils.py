@@ -88,9 +88,8 @@ class ZSLDataset(Dataset):
     def create_gzsl_dataset(self, n_samples=200):
         dataset = []
         for key, features in self.gzsl_map.items():
-            n_points = min(n_samples, len(features))
-            for f in random.sample(features, n_points):
-                dataset.append((f, -1, key))
+            aug_features = [random.choice(features) for _ in range(n_samples)]
+            dataset.extend([(f, -1, key) for f in aug_features])
         return dataset
 
     def create_orig_dataset(self):
@@ -102,7 +101,7 @@ class ZSLDataset(Dataset):
         self.train_classmap, self.test_classmap = self.get_classmap()
 
         if self.train:
-            labels = self.attribute_dict['trainval_loc'].reshape(-1)
+            labels = self.attribute_dict['train_loc'].reshape(-1)
             classmap = self.train_classmap
             self.gzsl_map = dict()
         else:

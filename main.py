@@ -23,7 +23,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    if args.dataset == 'awa2':
+    if args.dataset == 'awa2' or args.dataset == 'awa1':
         x_dim = 2048
         attr_dim = 85
         n_train = 40
@@ -33,6 +33,11 @@ def main():
         attr_dim = 312
         n_train = 150
         n_test = 50
+    elif args.dataset == 'sun':
+        x_dim = 2048
+        attr_dim = 102
+        n_train = 645
+        n_test = 72
     else:
         raise NotImplementedError
 
@@ -140,7 +145,7 @@ def main():
         else:
             acc = train_agent.compute_accuracy(test_generator, True)
 
-        if acc > best_acc:
+        if acc >= best_acc:
             best_acc = acc
             if args.gzsl:
                 best_acc_s = acc_s
