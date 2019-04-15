@@ -17,7 +17,7 @@ def parse_args():
     parser.add_argument('--gzsl', action='store_true', default=False)
     parser.add_argument('--da', action='store_true', default=False)
     parser.add_argument('--ca', action='store_true', default=False)
-    parser.add_argument('--discriminator', action='store_true', default=False)
+    parser.add_argument('--support', action='store_true', default=False)
 
     return parser.parse_args()
 
@@ -64,7 +64,7 @@ def main():
         'gzsl': args.gzsl,
         'use_da': args.da,
         'use_ca': args.ca,
-        'use_discriminator': args.discriminator,
+        'use_support': args.support,
     }
 
     train_agent = Trainer(

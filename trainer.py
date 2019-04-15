@@ -30,37 +30,38 @@ class Trainer:
         self.lr = lr
         self.z_dim = z_dim
 
-        self.x_encoder = Encoder(x_dim, layer_sizes['x_enc'], z_dim).to(self.device)
-        self.x_decoder = Decoder(z_dim, layer_sizes['x_dec'], x_dim).to(self.device)
-
-        self.c_encoder = Encoder(c_dim, layer_sizes['c_enc'], z_dim).to(self.device)
-        self.c_decoder = Decoder(z_dim, layer_sizes['c_dec'], c_dim).to(self.device)
-
-        params = list(self.x_encoder.parameters()) + \
-                 list(self.x_decoder.parameters()) + \
-                 list(self.c_encoder.parameters()) + \
-                 list(self.c_decoder.parameters())
-
-        self.optimizer = optim.Adam(params, lr=lr)
-
-        ## Extra discriminator - EXPERIMENTAL
-        self.discriminator = Classifier(z_dim, n_train).to(self.device)
-        self.criterion = nn.CrossEntropyLoss()
-        self.disc_optim = optim.Adam(self.discriminator.parameters(), lr=1e-6)
-
         self.n_train = n_train
         self.n_test = n_test
         self.gzsl = kwargs.get('gzsl', False)
         if self.gzsl:
             self.n_test = n_train + n_test
 
-        self.final_classifier = Classifier(z_dim, self.n_test).to(self.device)
-        self.final_cls_optim = optim.RMSprop(self.final_classifier.parameters(), lr=2e-4)
-
         # flags for various regularizers
         self.use_da = kwargs.get('use_da', False)
         self.use_ca = kwargs.get('use_ca', False)
-        self.use_discriminator = kwargs.get('use_discriminator', False)
+        self.use_support = kwargs.get('use_support', False)
+
+        self.x_encoder = Encoder(x_dim, layer_sizes['x_enc'], z_dim).to(self.device)
+        self.x_decoder = Decoder(z_dim, layer_sizes['x_dec'], x_dim).to(self.device)
+
+        self.c_encoder = Encoder(c_dim, layer_sizes['c_enc'], z_dim).to(self.device)
+        self.c_decoder = Decoder(z_dim, layer_sizes['c_dec'], c_dim).to(self.device)
+
+        self.support_classifier = Classifier(z_dim, self.n_train).to(self.device)
+
+        params = list(self.x_encoder.parameters()) + \
+                 list(self.x_decoder.parameters()) + \
+                 list(self.c_encoder.parameters()) + \
+                 list(self.c_decoder.parameters())
+
+        if self.use_support:
+            params += list(self.support_classifier.parameters())
+
+        self.optimizer = optim.Adam(params, lr=lr)
+
+        self.final_classifier = Classifier(z_dim, self.n_test).to(self.device)
+        self.final_cls_optim = optim.RMSprop(self.final_classifier.parameters(), lr=2e-4)
+        self.criterion = nn.CrossEntropyLoss()
 
         self.vae_save_path = './saved_models'
         self.disc_save_path = './saved_models/disc_model_%s.pth' % self.dset
@@ -122,7 +123,14 @@ class Trainer:
         if self.use_da:
             L_da = 2 * self.compute_da_loss(mu_x, logvar_x, mu_c, logvar_c)
 
-        total_loss = L_vae + self.gamma * L_ca + self.delta * L_da
+        # calculate loss from support classifier
+        L_sup = torch.zeros(1).to(self.device)
+        if self.use_support:
+            y_prob = F.softmax(self.support_classifier(z_x), dim=0)
+            log_prob = torch.log(torch.gather(y_prob, 1, y.unsqueeze(1)))
+            L_sup = -1 * torch.mean(log_prob)
+
+        total_loss = L_vae + self.gamma * L_ca + self.delta * L_da + self.alpha * L_sup
 
         self.optimizer.zero_grad()
         total_loss.backward()
@@ -159,8 +167,11 @@ class Trainer:
         if epoch >= 5 and epoch <= 22:
             self.delta = 0.54 * (epoch - 5)
 
-        # weight of discriminator loss
-        self.alpha = 0.01
+        # weight of support loss
+        if ep < 5:
+            self.alpha = 0
+        else:
+            self.alpha = 0.01
 
     def compute_recon_loss(self, x, x_recon):
         '''
@@ -208,6 +219,11 @@ class Trainer:
 
         return loss.item()
 
+    def fit_MOE(self, x, y):
+        '''
+        Trains the synthetic dataset on a MoE model
+        '''
+
     def get_vae_savename(self):
         '''
         Returns a string indicative of various flags used during training and
@@ -218,8 +234,8 @@ class Trainer:
             flags += '-da'
         if self.use_ca:
             flags += '-ca'
-        if self.use_discriminator:
-            flags += '-disc'
+        if self.use_support:
+            flags += '-support'
         model_name = 'vae_model__dset-%s__lr-%f__z-%d__%s.pth' %(self.dset, self.lr, self.z_dim, flags)
         return model_name
 
