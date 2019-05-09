@@ -168,7 +168,7 @@ class Trainer:
             self.delta = 0.54 * (epoch - 5)
 
         # weight of support loss
-        if ep < 5:
+        if epoch < 5:
             self.alpha = 0
         else:
             self.alpha = 0.01
